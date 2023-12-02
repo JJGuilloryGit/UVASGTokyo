@@ -5,7 +5,7 @@ resource "aws_launch_template" "app1_LT" {
 
   key_name = "MyLinuxBox"
 
-  vpc_security_group_ids = [aws_security_group.App1_SG1_Server.id]
+  vpc_security_group_ids = [aws_security_group.App1_80_SG1_Server.id]
 
   user_data = base64encode(<<-EOF
     #!/bin/bash
@@ -43,6 +43,7 @@ resource "aws_launch_template" "app1_LT" {
     <p><b>Instance Private Ip Address: </b> $local_ipv4</p>
     <p><b>Availability Zone: </b> $az</p>
     <p><b>Virtual Private Cloud (VPC):</b> $vpc</p>
+    <iframe src="https://giphy.com/embed/dUTXAiqyIQFXO83EDi" width="480" height="270" frameBorder="0" class="giphy-embed" allowFullScreen></iframe><p><a href="https://giphy.com/gifs/KURUMAIMPORTS-japanese-jdm-shibuyacrossing-dUTXAiqyIQFXO83EDi">via GIPHY</a></p>
     </div>
     </body>
     </html>
