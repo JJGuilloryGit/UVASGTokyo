@@ -125,7 +125,7 @@ resource "aws_iam_user_group_membership" "Paula" {
 }
 
 resource "aws_iam_group_policy" "GP4" {
-  name  = "Jump-Off-Options"
+  name  = "WifeyWork"
   group = aws_iam_group.my-group-4.name
   policy = jsonencode({
     Version = "2012-10-17"
