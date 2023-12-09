@@ -2,140 +2,86 @@ terraform {
   
 }
 
-#-New User One. (Group 1)
+##-Users, Groups & Group Memberships
 
-resource "aws_iam_user" "New-User-1" {
-  name = "Keisha"
+resource "aws_iam_user" "user" {
+  for_each = toset(var.users)
+  name     = each.value
 }
 
-resource "aws_iam_group" "my-group-1" {
-  name = "BabyMommaDestroyer1"
+resource "aws_iam_group" "group" {
+  for_each = var.iam_groups
+  name     = each.key
 }
 
-resource "aws_iam_user_group_membership" "Keisha" {
-  user = aws_iam_user.New-User-1.name
+# ##resource "aws_iam_group_membership" "group_membership" {
+#   for_each = var.group_users
 
-  groups = [
-    aws_iam_group.my-group-1.name
-  ]
-}
+#   name   = "${each.key}-membership"
+#   users  = each.value
+#   group  = aws_iam_group.group[each.key].name
+# }
 
-resource "aws_iam_group_policy" "GP1" {
-  name  = "KeishaControls"
-  group = aws_iam_group.my-group-1.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    "Statement": [
-		{
-			"Sid": "VisualEditor0",
-			"Effect": "Deny",
-			"Action": "autoscaling-plans:CreateScalingPlan",
-			"Resource": "*"
-      },
-    ]
-  })
-}
 
-#-New User Two (Group Two)
 
-resource "aws_iam_user" "New-User-2" {
-  name = "Wendy"
-}
+##-Policies for Groups
 
-resource "aws_iam_group" "my-group-2" {
-  name = "SideChick"
-}
+data "aws_iam_policy_document" "group_policies" {
+  for_each = var.group_policies
 
-resource "aws_iam_user_group_membership" "Wendy" {
-  user = aws_iam_user.New-User-2.name
-
-  groups = [
-    aws_iam_group.my-group-2.name
-  ]
-}
-
-resource "aws_iam_group_policy" "GP2" {
-  name  = "Side-Chick-Standards"
-  group = aws_iam_group.my-group-2.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    "Statement": [
-		{
-		  "Sid": "VisualEditor0",
-			"Effect": "Deny",
-			"Action": "s3:CreateBucket",
-			"Resource": "*"
-      },
-    ]
-  })
-}
-
-#-New User Three (Group Three)
-
-resource "aws_iam_user" "New-User-3" {
-  name = "Katie"
-}
-
-resource "aws_iam_group" "my-group-3" {
-  name = "JumpOff"
-}
-
-resource "aws_iam_user_group_membership" "Katie" {
-  user = aws_iam_user.New-User-3.name
-
-  groups = [
-    aws_iam_group.my-group-3.name
-  ]
-}
-
-resource "aws_iam_group_policy" "GP3" {
-  name  = "Jump-Off-Options"
-  group = aws_iam_group.my-group-3.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    "Statement": [
-		{
-		  "Sid": "VisualEditor0",
-			"Effect": "Deny",
-			"Action": "iam:CreateUser"
-      "Action": "iam:CreateGroup"
-			"Resource": "*"
-      },
-    ]
-  })
+  statement {
+    effect    = "Allow"
+    actions   = each.value
+    resources = ["*"]
+  }
 }
 
 
-#-New User Four (Group Four)
 
-resource "aws_iam_user" "New-User-4" {
-  name = "Paula"
+# resource "aws_iam_group_policy" "group_specific_policy" {
+#   for_each = var.group_policies
+#   name     = "${each.key}-policy"
+#   group    = aws_iam_group.group[each.key].name
+#   policy   = data.aws_iam_policy_document.group_policies[each.key].json
+# }
+
+
+data "aws_iam_policy_document" "mfa_policy" {
+  statement {
+    effect = "Allow"
+    actions = ["sts:GetSessionToken"]
+    resources = ["*"]
+
+    condition {
+      test     = "BoolIfExists"
+      variable = "aws:MultiFactorAuthPresent"
+      values   = ["true"]
+    }
+  }
 }
 
-resource "aws_iam_group" "my-group-4" {
-  name = "Wifey"
+resource "aws_iam_group_policy" "mfa_policy" {
+  for_each = { for k in var.mfa_enabled_groups : k => var.iam_groups[k] if contains(keys(var.iam_groups), k) }
+  name     = "${each.key}-mfa-policy"
+  group    = aws_iam_group.group[each.key].name
+  policy   = data.aws_iam_policy_document.mfa_policy.json
 }
 
-resource "aws_iam_user_group_membership" "Paula" {
-  user = aws_iam_user.New-User-4.name
 
-  groups = [
-    aws_iam_group.my-group-4.name
-  ]
+##-Access Keys for Users
+
+
+resource "aws_iam_access_key" "access_key" {
+  for_each = aws_iam_user.user
+  user     = each.value.name
 }
 
-resource "aws_iam_group_policy" "GP4" {
-  name  = "WifeyWork"
-  group = aws_iam_group.my-group-4.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    "Statement": [
-		{
-		  "Sid": "VisualEditor0",
-			"Effect": "Deny",
-			"Action": "ec2:CreateSecurityGroup"
-			"Resource": "*"
-      },
-    ]
-  })
+locals {
+  user_keys_csv = { for k, v in aws_iam_access_key.access_key : k => "access_key,secret_key\n${v.id},${v.secret}" }
+}
+
+resource "local_file" "user_keys" {
+  for_each = local.user_keys_csv
+  content  = each.value
+  filename = "${each.key}-keys.csv"
 }
